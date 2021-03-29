@@ -1,6 +1,8 @@
 import { SignUpController } from './signup'
 import { MissingParamError, InvalidParamError, ServerError } from '../errors'
 import { EmailValidator } from '../protocols'
+import { AddAccountModel, AddAcount } from '../../domain/usercases/add-account'
+import { AccountModel } from '../../domain/models/account'
 
 interface SutTypes {
   sut: SignUpController
@@ -16,10 +18,32 @@ const makeEmailValidator = (): EmailValidator => {
   return new EmailValidatorStub()
 }
 
+const makeAddAccount = (): AddAcount => {
+  class AddAcountStub implements AddAcount {
+    add (account: AddAccountModel): AccountModel {
+      const fakeAccount = {
+        id: 'valid_id',
+        name: 'valid_name',
+        email: 'valid_email@mail.com',
+        password: 'valid_password,'
+      }
+      return fakeAccount
+    }
+  }
+  return new AddAcountStub()
+}
+
+interface SutTypes {
+  sut: SignUpController
+  emailValidatorStub: EmailValidator
+  addAcountStub: AddAcount
+}
+
 const makeSut = (): SutTypes => {
   const emailValidatorStub = makeEmailValidator()
-  const sut = new SignUpController(emailValidatorStub)
-  return { sut, emailValidatorStub }
+  const addAcountStub = makeAddAccount()
+  const sut = new SignUpController(emailValidatorStub, addAcountStub)
+  return { sut, emailValidatorStub, addAcountStub }
 }
 describe('Signup Controller', () => {
   const { sut } = makeSut()
@@ -140,5 +164,24 @@ describe('Signup Controller', () => {
     const httpResponse = sut.handle(httpRequest)
     expect(httpResponse.statusCode).toBe(500)
     expect(httpResponse.body).toEqual(new ServerError())
+  })
+
+  test('Should call AddCount with correct values', () => {
+    const { sut, addAcountStub } = makeSut()
+    const addSpy = jest.spyOn(addAcountStub, 'add')
+    const httpRequest = {
+      body: {
+        name: 'any_mail',
+        email: 'any_email@gmail.com',
+        password: 'any_password',
+        passwordConfirmation: 'any_password'
+      }
+    }
+    sut.handle(httpRequest)
+    expect(addSpy).toHaveBeenCalledWith({
+      name: 'any_mail',
+      email: 'any_email@gmail.com',
+      password: 'any_password'
+    })
   })
 })
